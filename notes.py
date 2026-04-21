@@ -20,6 +20,7 @@ class Note:
     title: str
     body: str
     tags: str
+    remind_at: str
     pinned: int
     archived: int
 
@@ -45,6 +46,7 @@ def init_db() -> None:
                 title TEXT NOT NULL,
                 body TEXT NOT NULL DEFAULT '',
                 tags TEXT NOT NULL DEFAULT '',
+                remind_at TEXT NOT NULL DEFAULT '',
                 pinned INTEGER NOT NULL DEFAULT 0,
                 archived INTEGER NOT NULL DEFAULT 0
             )
@@ -52,6 +54,8 @@ def init_db() -> None:
         )
         if not column_exists(conn, "notes", "tags"):
             conn.execute("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if not column_exists(conn, "notes", "remind_at"):
+            conn.execute("ALTER TABLE notes ADD COLUMN remind_at TEXT NOT NULL DEFAULT ''")
         if not column_exists(conn, "notes", "pinned"):
             conn.execute("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
         if not column_exists(conn, "notes", "archived"):
@@ -59,19 +63,19 @@ def init_db() -> None:
         conn.commit()
 
 
-def add_note(title: str, body: str = "", tags: str = "") -> int:
+def add_note(title: str, body: str = "", tags: str = "", remind_at: str = "") -> int:
     init_db()
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with connect() as conn:
         cur = conn.execute(
-            "INSERT INTO notes (created_at, title, body, tags, pinned, archived) VALUES (?, ?, ?, ?, 0, 0)",
-            (created_at, title, body, tags),
+            "INSERT INTO notes (created_at, title, body, tags, remind_at, pinned, archived) VALUES (?, ?, ?, ?, ?, 0, 0)",
+            (created_at, title, body, tags, remind_at),
         )
         conn.commit()
         return int(cur.lastrowid)
 
 
-def edit_note(note_id: int, title: str | None = None, body: str | None = None, tags: str | None = None) -> bool:
+def edit_note(note_id: int, title: str | None = None, body: str | None = None, tags: str | None = None, remind_at: str | None = None) -> bool:
     init_db()
     updates = []
     params: list[object] = []
@@ -84,6 +88,9 @@ def edit_note(note_id: int, title: str | None = None, body: str | None = None, t
     if tags is not None:
         updates.append("tags = ?")
         params.append(tags)
+    if remind_at is not None:
+        updates.append("remind_at = ?")
+        params.append(remind_at)
     if not updates:
         return False
     params.append(note_id)
@@ -95,7 +102,7 @@ def edit_note(note_id: int, title: str | None = None, body: str | None = None, t
 
 def list_notes(include_pinned: bool = True, include_archived: bool = True) -> list[Note]:
     init_db()
-    query = "SELECT id, created_at, title, body, tags, pinned, archived FROM notes"
+    query = "SELECT id, created_at, title, body, tags, remind_at, pinned, archived FROM notes"
     clauses = []
     if not include_pinned:
         clauses.append("pinned = 0")
@@ -143,7 +150,7 @@ def search_notes(query_text: str) -> list[Note]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, created_at, title, body, tags, pinned, archived
+            SELECT id, created_at, title, body, tags, remind_at, pinned, archived
             FROM notes
             WHERE title LIKE ? OR body LIKE ? OR tags LIKE ?
             ORDER BY pinned DESC, archived ASC, created_at DESC, id DESC
@@ -159,12 +166,13 @@ def print_notes(rows: Iterable[Note]) -> None:
         print("No notes found.")
         return
 
-    print(f"{'ID':>4}  {'Created at':<20}  {'Pinned':<6}  {'Arch':<5}  Title  Tags  Body")
-    print("-" * 100)
+    print(f"{'ID':>4}  {'Created at':<20}  {'Due':<20}  {'Pinned':<6}  {'Arch':<5}  Title  Tags  Body")
+    print("-" * 120)
     for item in items:
         pinned = "yes" if item.pinned else "no"
         archived = "yes" if item.archived else "no"
-        print(f"{item.id:>4}  {item.created_at[:19]:<20}  {pinned:<6}  {archived:<5}  {item.title}  {item.tags}  {item.body}")
+        due = item.remind_at[:19] if item.remind_at else ""
+        print(f"{item.id:>4}  {item.created_at[:19]:<20}  {due:<20}  {pinned:<6}  {archived:<5}  {item.title}  {item.tags}  {item.body}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -175,12 +183,14 @@ def parse_args() -> argparse.Namespace:
     add_parser.add_argument("title", help="Note title")
     add_parser.add_argument("body", nargs="?", default="", help="Optional note body")
     add_parser.add_argument("--tags", default="", help="Comma-separated tags")
+    add_parser.add_argument("--when", dest="remind_at", default="", help="ISO timestamp when this should remind")
 
     edit_parser = subparsers.add_parser("edit", help="Edit a note")
     edit_parser.add_argument("id", type=int, help="Note ID")
     edit_parser.add_argument("--title", default=None, help="New title")
     edit_parser.add_argument("--body", default=None, help="New body")
     edit_parser.add_argument("--tags", default=None, help="New comma-separated tags")
+    edit_parser.add_argument("--when", dest="remind_at", default=None, help="New ISO timestamp when this should remind")
 
     list_parser = subparsers.add_parser("list", help="List notes")
     list_parser.add_argument("--unpinned-only", action="store_true", help="Show only unpinned notes")
@@ -214,12 +224,12 @@ def main() -> None:
         return
 
     if args.command == "add":
-        note_id = add_note(args.title, args.body, args.tags)
+        note_id = add_note(args.title, args.body, args.tags, args.remind_at)
         print(f"Recorded note #{note_id}")
         return
 
     if args.command == "edit":
-        if edit_note(args.id, args.title, args.body, args.tags):
+        if edit_note(args.id, args.title, args.body, args.tags, args.remind_at):
             print(f"Updated note #{args.id}")
         else:
             print(f"Note #{args.id} not found or nothing to update")

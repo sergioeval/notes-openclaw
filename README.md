@@ -1,6 +1,6 @@
 # Notes OpenClaw
 
-A simple Python CLI for notes backed by SQLite.
+A simple Python CLI for notes and reminders backed by SQLite.
 
 ## Commands
 
@@ -10,16 +10,16 @@ Initialize the database:
 python3 notes.py init
 ```
 
-Add a note:
+Add a reminder note:
 
 ```bash
-python3 notes.py add "Meeting ideas" "follow up on the UI" --tags work,ui
+python3 notes.py add "Pay taxes" "BBVA debit card" --tags reminder,finance --when "2026-04-30T23:59:00+00:00"
 ```
 
 Edit a note:
 
 ```bash
-python3 notes.py edit 1 --title "Updated title" --body "new text" --tags personal,important
+python3 notes.py edit 1 --title "Updated title" --body "new text" --tags personal,important --when "2026-04-30T23:59:00+00:00"
 ```
 
 List notes:
