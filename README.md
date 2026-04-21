@@ -13,7 +13,13 @@ python3 notes.py init
 Add a note:
 
 ```bash
-python3 notes.py add "Meeting ideas" "follow up on the UI"
+python3 notes.py add "Meeting ideas" "follow up on the UI" --tags work,ui
+```
+
+Edit a note:
+
+```bash
+python3 notes.py edit 1 --title "Updated title" --body "new text" --tags personal,important
 ```
 
 List notes:
@@ -28,10 +34,34 @@ List only unpinned notes:
 python3 notes.py list --unpinned-only
 ```
 
+List only unarchived notes:
+
+```bash
+python3 notes.py list --unarchived-only
+```
+
+Search notes:
+
+```bash
+python3 notes.py search ui
+```
+
 Pin a note:
 
 ```bash
 python3 notes.py pin 1
+```
+
+Archive a note:
+
+```bash
+python3 notes.py archive 1
+```
+
+Unarchive a note:
+
+```bash
+python3 notes.py unarchive 1
 ```
 
 Delete a note:
