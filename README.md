@@ -46,6 +46,12 @@ Search notes:
 python3 notes.py search ui
 ```
 
+Show due reminders:
+
+```bash
+python3 notes.py due
+```
+
 Pin a note:
 
 ```bash

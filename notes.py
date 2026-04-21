@@ -116,6 +116,22 @@ def list_notes(include_pinned: bool = True, include_archived: bool = True) -> li
     return [Note(**dict(row)) for row in rows]
 
 
+def due_notes(now_iso: str | None = None) -> list[Note]:
+    init_db()
+    now_iso = now_iso or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, created_at, title, body, tags, remind_at, pinned, archived
+            FROM notes
+            WHERE archived = 0 AND remind_at != '' AND remind_at <= ?
+            ORDER BY remind_at ASC, id ASC
+            """,
+            (now_iso,),
+        ).fetchall()
+    return [Note(**dict(row)) for row in rows]
+
+
 def set_flag(note_id: int, field: str, value: int) -> bool:
     init_db()
     with connect() as conn:
@@ -175,6 +191,14 @@ def print_notes(rows: Iterable[Note]) -> None:
         print(f"{item.id:>4}  {item.created_at[:19]:<20}  {due:<20}  {pinned:<6}  {archived:<5}  {item.title}  {item.tags}  {item.body}")
 
 
+def print_due_notes(rows: Iterable[Note]) -> None:
+    items = list(rows)
+    if not items:
+        print("No due reminders.")
+        return
+    print_notes(items)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simple notes CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -198,6 +222,9 @@ def parse_args() -> argparse.Namespace:
 
     search_parser = subparsers.add_parser("search", help="Search notes")
     search_parser.add_argument("query", help="Search text")
+
+    due_parser = subparsers.add_parser("due", help="Show due reminders")
+    due_parser.add_argument("--now", default=None, help="ISO timestamp to compare against")
 
     pin_parser = subparsers.add_parser("pin", help="Pin a note")
     pin_parser.add_argument("id", type=int, help="Note ID")
@@ -241,6 +268,10 @@ def main() -> None:
 
     if args.command == "search":
         print_notes(search_notes(args.query))
+        return
+
+    if args.command == "due":
+        print_due_notes(due_notes(args.now))
         return
 
     if args.command == "pin":
